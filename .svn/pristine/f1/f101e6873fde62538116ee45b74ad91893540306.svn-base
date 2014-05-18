@@ -1,0 +1,401 @@
+package com.watergrid.dst.client.manager;
+
+import com.google.gwt.core.client.GWT;
+import com.google.gwt.http.client.Request;
+import com.google.gwt.http.client.RequestBuilder;
+import com.google.gwt.http.client.RequestCallback;
+import com.google.gwt.http.client.RequestException;
+import com.google.gwt.http.client.Response;
+import com.google.gwt.http.client.URL;
+import com.google.gwt.user.client.ui.Label;
+import com.google.gwt.user.client.ui.RootPanel;
+import com.watergrid.dst.client.model.DMAmodel;
+
+//this class is in charge of creating a model from a given DMA name
+public class ModelFactory {
+	
+	
+	//static final String serverUrl="http://10.244.221.57:80/watergrid/dma/";						//using StudentCastle WiFi
+	//static final String serverUrl="http://169.254.10.32:80/watergrid/dma/";						//using Crossover ethernet cable
+	static final String serverUrl="http://besso.itservices.manchester.ac.uk:80/watergrid/dma/";		//using Besso server
+	
+	ModelManager modelManager;	//reference to the modelManager so we can CallBack
+	DMAmodel dmaModel;			//model to be created
+	String DMAname;
+	
+	boolean isBoundsCreationFinished;		//this boolean vbles let us know if the process of creation has been finished (they are switch to TRUE whenever the process finishes or has an error)
+	boolean isPipesCreationFinished;
+	boolean isValvesCreationFinished;
+	boolean isReservoirCreationFinished;
+	boolean isJunctionCreationFinished;
+	
+	boolean isBoundsCreationOK;				//this boolean vbles let us know if the process of creation has been done Successfully (retrieving data from server and creating objects by parsing)
+	boolean isPipesCreationOK;
+	boolean isValvesCreationOK;
+	boolean isReservoirCreationOK;
+	boolean isJunctionCreationOK;
+	
+	String errorLog;						//this string contains any errors
+	
+	public ModelFactory(ModelManager modelManager){
+		this.modelManager=modelManager;
+	}
+	
+	
+	
+	//this method is called to start the creation of a DMAmodel
+	public void createModel(String DMAname){
+		
+		//reset the variable that keep the status of all the creation process
+		isBoundsCreationFinished=isPipesCreationFinished=isValvesCreationFinished=isReservoirCreationFinished=isJunctionCreationFinished=false;
+		isBoundsCreationOK=isPipesCreationOK=isValvesCreationOK=isReservoirCreationOK=isJunctionCreationOK=false;
+		errorLog="";
+		
+		this.DMAname=DMAname;
+		
+		//temporal...This is because the model on server doesnt have any Valves
+		isValvesCreationFinished=true;
+		isValvesCreationOK=true;
+		
+		//fire-up all the creation methods. Remember that this methods are asynchornous, so they dont return anything. When each finishes (or error happens) they call the checkProcessStatus method that determines when everything has finished
+		createDMA();
+		createBoundary();
+		createJunctions();
+		createPipes();
+		createReservoirs();
+		//createValves();
+	}
+	
+	
+	
+	
+	//whenever something happens (finishing creating components, error in communication, exception) this method is called. 
+	//it determines whether the process has been finished and if it has been done successfully. and calls the createModel_complete so it can generate the callback to the modelmanager
+	private void checkProcessStatus(){
+		
+		//determine if all the processes has been finished (even with errors)
+		if(isBoundsCreationFinished && isPipesCreationFinished && isValvesCreationFinished && isReservoirCreationFinished && isJunctionCreationFinished){
+			
+			
+			//determine if all the creation process was completed OK and callBack ModelManager
+			if(isBoundsCreationOK && isPipesCreationOK && isValvesCreationOK && isReservoirCreationOK && isJunctionCreationOK){
+				modelManager.createModel_callBack(dmaModel,true,errorLog);
+			}
+			else{
+				modelManager.createModel_callBack(null,false,errorLog);
+			}
+			
+		}
+	}
+	
+	
+	////////////////////////////////////////////////////////
+	//MODEL CREATION (Server communication and XML parsing using the ModelFactoryHelperXML class
+	////////////////////////////////////////////////////////
+	
+	
+	private void createDMA(){
+		dmaModel=new DMAmodel(DMAname);
+	}
+	///////////
+	// Boundary
+	///////////
+	private void createBoundary(){
+		
+		String url = serverUrl+DMAname+"/boundary";
+		String type="GET";
+		String content="null";
+		RequestBuilder rb = new RequestBuilder(RequestBuilder.POST,GWT.getHostPageBaseURL()+"xml.proxy");
+		rb.setRequestData("url="+URL.encodeQueryString(url)+"&type="+type+"&content="+content); //esto es un formato que yo me invente que despues se lee en el proxy segun los nombres de los campos: url, type, content
+		rb.setHeader("Content-Type", "application/x-www-form-urlencoded");
+
+		rb.setCallback(new RequestCallback() {
+			@Override
+			public void onResponseReceived(Request request, Response response) {
+				if(response.getStatusCode()==200){
+					//create objects from XML here using the helper class and assign them to the model. This method throws and exception is Parsing fails
+					try {
+						ModelFactoryHelperXML.createBoundaryFromXML(response.getText(), dmaModel);
+						isBoundsCreationOK=true;
+					} catch (Exception e) {
+						isBoundsCreationOK=false;
+						errorLog=errorLog+"BOUNDARY: Parsing error \n";
+					}
+					finally{
+						isBoundsCreationFinished=true;
+						checkProcessStatus();
+					}
+					
+				}
+				else{
+					isBoundsCreationFinished=true;
+					isBoundsCreationOK=false;
+					errorLog=errorLog+"BOUNDARY:"+"Error"+response.getStatusCode()+"\n";
+					checkProcessStatus();
+				}
+			}
+			
+			@Override
+			public void onError(Request request, Throwable exception) {
+				isBoundsCreationFinished=true;
+				isBoundsCreationOK=false;
+				errorLog=errorLog+"BOUNDARY:"+"Server Error \n";
+				checkProcessStatus();
+			}
+		});
+
+		
+		try{
+			rb.send();
+		}
+		catch(RequestException e){
+			isBoundsCreationFinished=true;
+			isBoundsCreationOK=false;
+			errorLog=errorLog+"BOUNDARY:"+"Fetch Error \n";
+			checkProcessStatus();
+			
+		}
+	}
+	///////////
+	// Junctions
+	///////////
+	private void createJunctions(){
+		
+			String url = serverUrl+DMAname+"/junctions";
+			String type="GET";
+			String content="null";
+			RequestBuilder rb = new RequestBuilder(RequestBuilder.POST,GWT.getHostPageBaseURL()+"xml.proxy");
+			rb.setRequestData("url="+URL.encodeQueryString(url)+"&type="+type+"&content="+content); //esto es un formato que yo me invente que despues se lee en el proxy segun los nombres de los campos: url, type, content
+			rb.setHeader("Content-Type", "application/x-www-form-urlencoded");
+
+			rb.setCallback(new RequestCallback() {
+				@Override
+				public void onResponseReceived(Request request, Response response) {
+					if(response.getStatusCode()==200){
+						
+						//create objects from XML here using the helper class and assign them to the model. This method throws and exception is Parsing fails
+						try {
+							ModelFactoryHelperXML.createJunctionsFromXML(response.getText(), dmaModel);
+							isJunctionCreationOK=true;
+						} catch (Exception e) {
+							isJunctionCreationOK=false;
+							errorLog=errorLog+"JUNCTIONS: Parsing error \n";
+						}
+						finally{
+							isJunctionCreationFinished=true;
+							checkProcessStatus();
+						}
+
+					}
+					else{
+						isJunctionCreationFinished=true;
+						isJunctionCreationOK=false;
+						errorLog=errorLog+"JUNCTIONS:"+"Error"+response.getStatusCode()+"\n";
+						checkProcessStatus();
+					}
+				}
+				
+				@Override
+				public void onError(Request request, Throwable exception) {
+					isJunctionCreationFinished=true;
+					isJunctionCreationOK=false;
+					errorLog=errorLog+"JUNCTIONS:"+"Server Error \n";
+					checkProcessStatus();
+				}
+			});
+
+			try{
+				rb.send();
+			}
+			catch(RequestException e){
+				isJunctionCreationFinished=true;
+				isJunctionCreationOK=false;
+				errorLog=errorLog+"JUNCTIONS:"+"Fetch Error \n";
+				checkProcessStatus();
+				
+			}
+	}
+	///////////
+	// Pipes
+	///////////
+	private void createPipes(){
+		
+		String url = serverUrl+DMAname+"/pipes";
+		String type="GET";
+		String content="null";
+		RequestBuilder rb = new RequestBuilder(RequestBuilder.POST,GWT.getHostPageBaseURL()+"xml.proxy");
+		rb.setRequestData("url="+URL.encodeQueryString(url)+"&type="+type+"&content="+content); //esto es un formato que yo me invente que despues se lee en el proxy segun los nombres de los campos: url, type, content
+		rb.setHeader("Content-Type", "application/x-www-form-urlencoded");
+
+		rb.setCallback(new RequestCallback() {
+			@Override
+			public void onResponseReceived(Request request, Response response) {
+				if(response.getStatusCode()==200){
+					
+					//create objects from XML here using the helper class and assign them to the model. This method throws and exception is Parsing fails
+					try {
+						ModelFactoryHelperXML.createPipesFromXML(response.getText(), dmaModel);
+						isPipesCreationOK=true;
+					} catch (Exception e) {
+						isPipesCreationOK=false;
+						errorLog=errorLog+"PIPES: Parsing error \n";
+					}
+					finally{
+						isPipesCreationFinished=true;
+						checkProcessStatus();
+					}
+
+				}
+				else{
+					isPipesCreationFinished=true;
+					isPipesCreationOK=false;
+					errorLog=errorLog+"PIPES:"+"Error"+response.getStatusCode()+"\n";
+					checkProcessStatus();
+				}
+			}
+			
+			@Override
+			public void onError(Request request, Throwable exception) {
+				isPipesCreationFinished=true;
+				isPipesCreationOK=false;
+				errorLog=errorLog+"PIPES:"+"Server Error \n";
+				checkProcessStatus();
+			}
+		});
+
+		try{
+			rb.send();
+		}
+		catch(RequestException e){
+			isPipesCreationFinished=true;
+			isPipesCreationOK=false;
+			errorLog=errorLog+"PIPES:"+"Fetch Error \n";
+			checkProcessStatus();
+			
+		}
+	}
+	
+	///////////
+	// Reservoirs
+	///////////
+	private void createReservoirs(){
+		
+		String url = serverUrl+DMAname+"/reservoirs";
+		String type="GET";
+		String content="null";
+		RequestBuilder rb = new RequestBuilder(RequestBuilder.POST,GWT.getHostPageBaseURL()+"xml.proxy");
+		rb.setRequestData("url="+URL.encodeQueryString(url)+"&type="+type+"&content="+content); //esto es un formato que yo me invente que despues se lee en el proxy segun los nombres de los campos: url, type, content
+		rb.setHeader("Content-Type", "application/x-www-form-urlencoded");
+
+		rb.setCallback(new RequestCallback() {
+			@Override
+			public void onResponseReceived(Request request, Response response) {
+				if(response.getStatusCode()==200){
+					
+					//create objects from XML here using the helper class and assign them to the model. This method throws and exception is Parsing fails
+					try {
+						ModelFactoryHelperXML.createReservoirsFromXML(response.getText(), dmaModel);
+						isReservoirCreationOK=true;
+					} catch (Exception e) {
+						isReservoirCreationOK=false;
+						errorLog=errorLog+"RESERVOIRS: Parsing error \n";
+					}
+					finally{
+						isReservoirCreationFinished=true;
+						checkProcessStatus();
+					}
+
+				}
+				else{
+					isReservoirCreationFinished=true;
+					isReservoirCreationOK=false;
+					errorLog=errorLog+"RESERVOIRS:"+"Error"+response.getStatusCode()+"\n";
+					checkProcessStatus();
+				}
+			}
+			
+			@Override
+			public void onError(Request request, Throwable exception) {
+				isReservoirCreationFinished=true;
+				isReservoirCreationOK=false;
+				errorLog=errorLog+"RESERVOIRS:"+"Server Error \n";
+				checkProcessStatus();
+			}
+		});
+
+		try{
+			rb.send();
+		}
+		catch(RequestException e){
+			isReservoirCreationFinished=true;
+			isReservoirCreationOK=false;
+			errorLog=errorLog+"RESERVOIRS:"+"Fetch Error \n";
+			checkProcessStatus();
+		}
+	}
+
+	///////////
+	// Valves
+	///////////
+	
+	private void createValves(){
+		
+		String url = serverUrl+DMAname+"/valves";
+		String type="GET";
+		String content="null";
+		RequestBuilder rb = new RequestBuilder(RequestBuilder.POST,GWT.getHostPageBaseURL()+"xml.proxy");
+		rb.setRequestData("url="+URL.encodeQueryString(url)+"&type="+type+"&content="+content); //esto es un formato que yo me invente que despues se lee en el proxy segun los nombres de los campos: url, type, content
+		rb.setHeader("Content-Type", "application/x-www-form-urlencoded");
+
+		rb.setCallback(new RequestCallback() {
+			@Override
+			public void onResponseReceived(Request request, Response response) {
+				if(response.getStatusCode()==200){
+					
+					//create objects from XML here using the helper class and assign them to the model. This method throws and exception is Parsing fails
+					try {
+						RootPanel.get("bottom").add(new Label(response.getText()));
+						ModelFactoryHelperXML.createValvesFromXML(response.getText(), dmaModel);
+						isValvesCreationOK=true;
+					} catch (Exception e) {
+						isValvesCreationOK=false;
+						errorLog=errorLog+"VALVES: Parsing error \n";
+					}
+					finally{
+						isValvesCreationFinished=true;
+						checkProcessStatus();
+					}
+
+				}
+				else{
+					isValvesCreationFinished=true;
+					isValvesCreationOK=false;
+					errorLog=errorLog+"VALVES:"+"Error"+response.getStatusCode()+"\n";
+					checkProcessStatus();
+				}
+			}
+			
+			@Override
+			public void onError(Request request, Throwable exception) {
+				isValvesCreationFinished=true;
+				isValvesCreationOK=false;
+				errorLog=errorLog+"VALVES:"+"Server Error \n";
+				checkProcessStatus();
+			}
+		});
+
+		try{
+			rb.send();
+		}
+		catch(RequestException e){
+			isValvesCreationFinished=true;
+			isValvesCreationOK=false;
+			errorLog=errorLog+"VALVES:"+"Fetch Error \n";
+			checkProcessStatus();
+		}
+	}
+
+
+}
+
+//RootPanel.get("bottom").add(new Label(response.getText()));

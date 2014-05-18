@@ -1,0 +1,43 @@
+<!doctype html>
+
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+
+
+	<title>WaterMAN</title>
+	
+	<link rel="shortcut icon" href="drop.ico" type="image/x-icon" /> 
+
+	
+    <link type="text/css" rel="stylesheet" href="DST.css">
+
+	<script type="text/javascript" language="javascript" src="CoordinateConverter.js"></script>
+    <script type="text/javascript" language="javascript" src="dst/dst.nocache.js"></script>
+    <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCaZ9yk3WcE0nU1eUqyMranMWGmiKelGeE&sensor=false"></script>
+    
+    <style>
+      html { height: 100% }
+      body { height: 100%; margin: 0px; padding: 0px }
+    </style>
+  </head>
+
+  <body>
+
+	
+	<div id="container" style="width: 100%;height:100%">
+		<div id="top" style="background-color: #00BFFF;height: 0%">
+			<div id="topLeft"style="background-color: #2E9AFE; height: 100%; width: 20%; float: left;"></div>
+			<div id="topCenter"style="background-color: #E1E6F8;height: 100%; width: 65%; float: left"></div>
+			<div id="topRight"style="background-color: #E1E6F8; height: 100%; width: 15%; float: left;"></div>
+		</div>
+		<div id="left"style="background-color: #E1E6F8; height: 96%; width: 20%; float: left;"></div>
+		<div id="center"style="height: 96%; width: 65%; float: left;text-align: center"></div>
+		<div id="right"style="background-color: #E1E6F8; height: 96%; width: 15%; float: left;"></div>
+		<div id="bottom"style="background-color: #E1E6F8; clear: both; text-align: center;height: 4%">WaterMAN DST - © Copyright 2013 UoM. All Rights Reserved.</div>
+	</div>
+	
+
+
+  </body>
+</html>

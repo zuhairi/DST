@@ -1,0 +1,105 @@
+
+
+package com.watergrid.dst.client.manager;
+
+import java.util.ArrayList;
+
+import com.watergrid.dst.client.model.Scenario;
+import com.watergrid.dst.client.model.ScenarioAction;
+
+public abstract class Simulator {
+
+	ScenarioSimulatorManager simulatorManager;				//reference to it for the callBacks
+	
+	String DMAname;
+	Scenario scenario;										//scenario we are going to simulate
+	int scenarioIndex;
+	boolean isReRun;
+	
+	//static final String serverUrl="http://10.244.221.57:80/watergrid/dma/";						//using StudentCastle WiFi
+	//final String serverUrl="http://169.254.10.32:80/watergrid/dma/";								//using Crossover Ethernet cable
+	//static final String serverUrl="http://besso.itservices.manchester.ac.uk:80/watergrid/dma/";		//using Besso server
+	static final String serverUrl="http://zrek.itservices.manchester.ac.uk:80/watergrid/dma/";
+	
+	String timeParametersXML;
+	String actionsXML;
+	String requestXML;
+	
+	String errorLog;		//error in simulation
+	boolean isOK;			//boolean flag that says if everything was OK. 
+	
+	
+	public Simulator(ScenarioSimulatorManager simulatorManager, String DMAname,Scenario scenario,int scenarioIndex,boolean isReRun){
+		this.simulatorManager=simulatorManager;
+		this.DMAname=DMAname;
+		this.scenario=scenario;
+		this.scenarioIndex=scenarioIndex;
+		this.isReRun=isReRun;
+	}
+	
+	
+	///////////////////////
+	// TEMPLATE METHOD
+	///////////////////////
+	
+	public void simulate(){
+		
+		createTimeParametersXML();					//create parametersXML (this is common to all)
+		createActionsXML();							//create actions XML (this is common to all)
+		createRequestXML();							//create request XML putting all together (each type adds some stuff and builds the XML with some differences)
+		sendRequestToServer();						//make the POST request to the server
+	}
+	
+	
+	/////////////////////////////////////////////////////////////////////////
+	//  ABSTRACT steps of the simulation (each subclass gives its own version)
+	/////////////////////////////////////////////////////////////////////////
+	
+	
+
+	protected abstract void createRequestXML();							//the overall XML changes depending on the type of simulation
+	
+	protected abstract void sendRequestToServer();						//the request depends on the type of simulation
+	
+	
+	/////////////////////////////////////////////////////////////////////////////////////
+	//  COMMON implementation to all types of simulations. This steps are the same for all
+	/////////////////////////////////////////////////////////////////////////////////////
+	
+	
+	//this method creates the XML of the time parameters
+	protected void createTimeParametersXML(){
+		
+		timeParametersXML="";
+		
+		String startTime=scenario.getStartTime();
+		String interval = String.valueOf(scenario.getIterationLength());
+		String duration = String.valueOf(scenario.getTotalDuration());
+		
+		timeParametersXML="<time_params start=\"" + startTime + "\" ";
+		timeParametersXML=timeParametersXML+"interval=\""+interval+"\" ";
+		timeParametersXML=timeParametersXML+"duration=\"" + duration +"\" />";
+	}
+	
+	
+	//this method creates the XML of the actions.
+	protected void createActionsXML(){
+		
+		ArrayList<ScenarioAction> actions = scenario.getActions();
+		ScenarioAction action;
+		
+		actionsXML="<changes>"+"\n";
+		
+		for(int i=0;i<actions.size();i++){
+			
+			action=actions.get(i);
+			actionsXML=actionsXML +"<" + action.getComponentCategory() + " ";
+			actionsXML=actionsXML + "id=\"" + action.getComponentId() + "\" ";
+			actionsXML=actionsXML + "status=\""+ action.getComponentAction() + "\" ";
+			actionsXML=actionsXML + "time=\"" + action.getActionTime()+"\" />" + "\n"; 
+		}
+		actionsXML=actionsXML+"</changes>";
+	}
+	
+	
+}
